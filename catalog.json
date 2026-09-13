@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "generated_at": "2026-09-13T16:35:18+00:00",
+  "manga": [
+    {
+      "id": "a-break-from-work-sonofan",
+      "title": "A Break From Work [Sonofan]",
+      "cover": "manga/a-break-from-work-sonofan/cover.jpg",
+      "info": "manga/a-break-from-work-sonofan/info.json",
+      "chapters": [
+        {
+          "id": "a-break-from-work-sonofan-ch-001",
+          "number": 1,
+          "title": "A Break From Work [Sonofan]",
+          "path": "manga/a-break-from-work-sonofan/ch-001/",
+          "uploaded_at": "2026-09-13T16:35:18+00:00"
+        }
+      ]
+    }
+  ]
+}
