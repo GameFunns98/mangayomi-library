@@ -2,83 +2,92 @@ const BASE_RAW = "https://raw.githubusercontent.com/GameFunns98/mangayomi-librar
 
 async function fetchCatalog() {
   const res = await fetch(`${BASE_RAW}/catalog.json`);
-  if (!res.ok) throw new Error("Cannot load catalog.json");
+  if (!res.ok) throw new Error(`Cannot load catalog.json (${res.status})`);
   return await res.json();
 }
 
-function toMangaItem(m) {
+function mapManga(m) {
   return {
-    id: m.id,
-    title: m.title,
+    name: m.title,
+    url: m.id,
     imageUrl: `${BASE_RAW}/${m.cover}`,
-    description: m.title,
   };
 }
 
-// REQUIRED by Popular tab
 async function getPopular(page) {
-  const catalog = await fetchCatalog();
-  const list = (catalog.manga || []).map(toMangaItem);
-  return { list, hasNextPage: false };
+  const c = await fetchCatalog();
+  return {
+    list: (c.manga || []).map(mapManga),
+    hasNextPage: false,
+  };
 }
 
-// REQUIRED by Latest tab
 async function getLatest(page) {
-  const catalog = await fetchCatalog();
-  const list = [...(catalog.manga || [])]
-    .sort((a, b) => (b.chapters?.length || 0) - (a.chapters?.length || 0))
-    .map(toMangaItem);
+  const c = await fetchCatalog();
+  const list = [...(c.manga || [])].sort((a, b) => {
+    const ad = a?.chapters?.[a.chapters.length - 1]?.uploaded_at || "";
+    const bd = b?.chapters?.[b.chapters.length - 1]?.uploaded_at || "";
+    return bd.localeCompare(ad);
+  });
+  return {
+    list: list.map(mapManga),
+    hasNextPage: false,
+  };
+}
+
+async function search(query, page) {
+  const c = await fetchCatalog();
+  const q = (query || "").trim().toLowerCase();
+  const list = (c.manga || [])
+    .filter(m => !q || (m.title || "").toLowerCase().includes(q))
+    .map(mapManga);
+
   return { list, hasNextPage: false };
 }
 
-// usually required by source detail page
-async function getDetail(url) {
-  const catalog = await fetchCatalog();
-  const m = (catalog.manga || []).find(x => x.id === url);
+async function detail(url) {
+  const c = await fetchCatalog();
+  const m = (c.manga || []).find(x => x.id === url);
   if (!m) throw new Error("Manga not found");
 
   return {
-    id: m.id,
-    title: m.title,
+    name: m.title,
+    url: m.id,
     imageUrl: `${BASE_RAW}/${m.cover}`,
     description: m.title,
   };
 }
 
 async function getChapters(url) {
-  const catalog = await fetchCatalog();
-  const m = (catalog.manga || []).find(x => x.id === url);
+  const c = await fetchCatalog();
+  const m = (c.manga || []).find(x => x.id === url);
   if (!m) return [];
 
-  return (m.chapters || [])
-    .sort((a, b) => a.number - b.number)
+  return [...(m.chapters || [])]
+    .sort((a, b) => Number(a.number) - Number(b.number))
     .map(ch => ({
-      id: ch.id,
-      title: ch.title || `Chapter ${ch.number}`,
+      name: ch.title || `Chapter ${ch.number}`,
       url: ch.id,
-      chapterNumber: ch.number,
+      chapterNumber: Number(ch.number) || 0,
     }));
 }
 
 async function getPages(chapterUrl) {
-  const catalog = await fetchCatalog();
+  const c = await fetchCatalog();
 
-  let found = null;
-  for (const m of (catalog.manga || [])) {
-    const ch = (m.chapters || []).find(c => c.id === chapterUrl);
-    if (ch) {
-      found = ch;
-      break;
-    }
+  for (const m of (c.manga || [])) {
+    const ch = (m.chapters || []).find(x => x.id === chapterUrl);
+    if (!ch) continue;
+
+    const res = await fetch(`${BASE_RAW}/${ch.path}pages.json`);
+    if (!res.ok) throw new Error(`Cannot load pages.json (${res.status})`);
+
+    const data = await res.json();
+    return (data.pages || []).map((p, i) => ({
+      index: i,
+      url: `${BASE_RAW}/${ch.path}${p}`,
+    }));
   }
-  if (!found) return [];
 
-  const res = await fetch(`${BASE_RAW}/${found.path}pages.json`);
-  if (!res.ok) throw new Error("Cannot load pages.json");
-  const data = await res.json();
-
-  return (data.pages || []).map((name, i) => ({
-    index: i,
-    url: `${BASE_RAW}/${found.path}${name}`
-  }));
+  return [];
 }
